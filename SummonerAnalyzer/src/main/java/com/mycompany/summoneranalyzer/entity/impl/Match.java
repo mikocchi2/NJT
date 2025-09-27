@@ -9,7 +9,7 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime; 
 
 @Entity
-@Table(name = "match")
+@Table(name = "matches")
 public class Match {
 
     @Id
