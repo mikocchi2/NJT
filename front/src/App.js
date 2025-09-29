@@ -47,12 +47,7 @@ export default function App() {
         <Route path="/profile/:id" element={<Profile/>} />
         <Route path="/favorites" element={token ? <Favorites/> : <Navigate to="/login" replace />} />
          <Route path="/summoners" element={<Summoners />} />
-        <Route path="/admin" element={
-          // jednostavna zaštita na frontu (BE i dalje autoritativno proverava rolu)
-          (JSON.parse(localStorage.getItem("user")||"{}")?.role === "ADMIN")
-            ? <Admin/>
-            : <Navigate to="/" replace />
-        } />
+        <Route path="/admin" element={  <Admin/>  } />
 
 
         <Route path="*" element={<Navigate to="/" replace />} />
