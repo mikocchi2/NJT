@@ -9,6 +9,7 @@ import Favorites from "./pages/Favorites";
 import Admin from "./pages/Admin";
 import "./App.css";
 import Navbar from "./components/Navbar";
+import Summoners from "./pages/Summoners";
 
 
  
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="/search" element={<Search/>} />
         <Route path="/profile/:id" element={<Profile/>} />
         <Route path="/favorites" element={token ? <Favorites/> : <Navigate to="/login" replace />} />
+         <Route path="/summoners" element={<Summoners />} />
         <Route path="/admin" element={
           // jednostavna zaštita na frontu (BE i dalje autoritativno proverava rolu)
           (JSON.parse(localStorage.getItem("user")||"{}")?.role === "ADMIN")
