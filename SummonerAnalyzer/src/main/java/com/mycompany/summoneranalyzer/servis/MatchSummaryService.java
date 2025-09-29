@@ -60,4 +60,7 @@ public class MatchSummaryService {
 
     @Transactional
     public void deleteById(Long id) { repo.deleteById(id); }
+    public List<MatchSummaryDto> findBySummonerId(Long summonerId) {
+        return repo.findBySummonerId(summonerId).stream().map(mapper::toDto).toList();
+    }
 }

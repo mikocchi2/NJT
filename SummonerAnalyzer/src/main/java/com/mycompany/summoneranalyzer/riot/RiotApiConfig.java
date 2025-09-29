@@ -15,7 +15,14 @@ public class RiotApiConfig {
     @Bean
     public WebClient riotWebClient(@Value("${riot.api.key}") String apiKey) {
         return WebClient.builder()
-                .defaultHeader("X-Riot-Token", apiKey)
-                .build();
+            .defaultHeader("X-Riot-Token", apiKey.trim())
+            .filter((request, next) -> next.exchange(request)
+                .doOnNext(resp -> {
+                    if (resp.statusCode().isError()) {
+                        // ovde   logovati status/URL
+                    }
+                })
+            )
+            .build();
     }
 }

@@ -1,68 +1,83 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
-package com.mycompany.summoneranalyzer.controller; 
- 
+package com.mycompany.summoneranalyzer.controller;
 
 import com.mycompany.summoneranalyzer.dto.impl.SummonerProfileDto;
 import com.mycompany.summoneranalyzer.entity.impl.enums.Region;
 import com.mycompany.summoneranalyzer.servis.SummonerProfileService;
+import com.mycompany.summoneranalyzer.servis.SummonerSyncService;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import java.util.List; 
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-@CrossOrigin(origins = "http://localhost:3000")
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/summoners")
 @Tag(name = "Summoners")
+@CrossOrigin(origins = {  "http://localhost:3000" })
 public class SummonerProfileController {
 
-    private final SummonerProfileService service;
+    private final SummonerProfileService profiles;
+    private final SummonerSyncService sync;
 
-    public SummonerProfileController(SummonerProfileService service) {
-        this.service = service;
+    public SummonerProfileController(SummonerProfileService profiles, SummonerSyncService sync) {
+        this.profiles = profiles;
+        this.sync = sync;
     }
 
-    // GET /api/summoners
     @GetMapping
     public ResponseEntity<List<SummonerProfileDto>> all() {
-        return new ResponseEntity<>(service.findAll(), HttpStatus.OK);
+        return ResponseEntity.ok(profiles.findAll());
     }
 
-    // GET /api/summoners/{id}
     @GetMapping("/{id}")
     public ResponseEntity<SummonerProfileDto> byId(@PathVariable Long id) {
         try {
-            return ResponseEntity.ok(service.findById(id));
+            return ResponseEntity.ok(profiles.findById(id));
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
         }
     }
 
-    // GET /api/summoners/search?name=Faker&region=EUNE
     @GetMapping("/search")
-    public ResponseEntity<SummonerProfileDto> search(@RequestParam String name, @RequestParam Region region) {
+    public ResponseEntity<SummonerProfileDto> search(
+            @RequestParam String name,
+            @RequestParam Region region
+    ) {
         try {
-            return ResponseEntity.ok(service.findByNameAndRegion(name, region));
+            return ResponseEntity.ok(profiles.findByNameAndRegion(name, region));
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
         }
     }
 
-    // POST /api/summoners/upsert    (poziva front nakon Riot API poziva)
+    /** prima i 'name' i 'riotId' (front šalje 'riotId') */
+    @PostMapping("/sync")
+    public ResponseEntity<SummonerProfileDto> syncByName(
+        @RequestParam(required = false) String name,
+        @RequestParam(required = false, name = "riotId") String riotId,
+        @RequestParam(defaultValue = "EUNE") Region region,
+        @RequestParam(defaultValue = "10") int lastN
+    ) {
+        try {
+            String input = (riotId != null && !riotId.isBlank()) ? riotId : name;
+            if (input == null || input.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parametar 'name' ili 'riotId' je obavezan");
+            }
+            return ResponseEntity.ok(sync.syncByName(input, region, lastN));
+        } catch (Exception e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Sync failed: " + e.getMessage());
+        }
+    }
+
     @PostMapping("/upsert")
     public ResponseEntity<SummonerProfileDto> upsert(@RequestBody SummonerProfileDto dto) {
-        return new ResponseEntity<>(service.upsert(dto), HttpStatus.OK);
+        return ResponseEntity.ok(profiles.upsert(dto));
     }
 
-    // DELETE /api/summoners/{id}
     @DeleteMapping("/{id}")
     public ResponseEntity<String> delete(@PathVariable Long id) {
-        service.deleteById(id);
+        profiles.deleteById(id);
         return ResponseEntity.ok("Summoner deleted");
     }
 }

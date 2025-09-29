@@ -1,17 +1,14 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
-package com.mycompany.summoneranalyzer.servis; 
+package com.mycompany.summoneranalyzer.servis;
 
 import com.mycompany.summoneranalyzer.dto.impl.MatchDto;
 import com.mycompany.summoneranalyzer.entity.impl.Match;
 import com.mycompany.summoneranalyzer.mapper.impl.MatchMapper;
 import com.mycompany.summoneranalyzer.repository.impl.MatchRepository;
 import jakarta.transaction.Transactional;
-import java.util.List;
-import java.util.stream.Collectors; 
 import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class MatchService {
@@ -40,5 +37,10 @@ public class MatchService {
 
     @Transactional
     public void deleteById(String id) { repo.deleteById(id); }
-}
 
+    /** NE baca izuzetak – koristi repo.findByIdOrNull (dodato u repo). */
+    public MatchDto findByIdOrNull(String id) {
+        Match e = repo.findByIdOrNull(id);
+        return e != null ? mapper.toDto(e) : null;
+    }
+}

@@ -42,22 +42,35 @@ public class SummonerProfileService {
 
     /** Upsert iz Riot API podataka (ključ: puuid) */
     @Transactional
-    public SummonerProfileDto upsert(SummonerProfileDto dto) {
-        SummonerProfile existing = dto.getPuuid() != null ? repo.findByPuuid(dto.getPuuid()) : null;
-        SummonerProfile e = existing != null ? existing : new SummonerProfile();
-        // mapiranje (ručno/mapper)
-        e.setPuuid(dto.getPuuid());
-        e.setName(dto.getName());
-        if (dto.getRegion() != null) e.setRegion(dto.getRegion());
-        if (dto.getLevel() != null) e.setLevel(dto.getLevel());
-        e.setRankTier(dto.getRankTier());
-        e.setRankDivision(dto.getRankDivision());
-        e.setLeaguePoints(dto.getLeaguePoints());
-        e.setLastSyncedAt(LocalDateTime.now());
+ 
+public SummonerProfileDto upsert(SummonerProfileDto dto) {
+    SummonerProfile existing = dto.getPuuid() != null ? repo.findByPuuid(dto.getPuuid()) : null;
+    SummonerProfile e = existing != null ? existing : new SummonerProfile();
 
-        repo.save(e);
-        return mapper.toDto(e);
+    e.setPuuid(dto.getPuuid());
+
+    // Fallback za name da NIKAD ne bude null/prazno (sprečava tvoj SQL constraint)
+    String fallbackName = null;
+    if (dto.getName() != null && !dto.getName().isBlank()) {
+        fallbackName = dto.getName();
+    } else if (dto.getPuuid() != null && dto.getPuuid().length() >= 8) {
+        fallbackName = "Player-" + dto.getPuuid().substring(0, 8);
+    } else {
+        fallbackName = "Unknown";
     }
+    e.setName(fallbackName);
+
+    if (dto.getRegion() != null) e.setRegion(dto.getRegion());
+    if (dto.getLevel() != null) e.setLevel(dto.getLevel());
+    e.setRankTier(dto.getRankTier());
+    e.setRankDivision(dto.getRankDivision());
+    e.setLeaguePoints(dto.getLeaguePoints());
+    e.setLastSyncedAt(LocalDateTime.now());
+
+    repo.save(e);
+    return mapper.toDto(e);
+}
+
 
     @Transactional
     public void deleteById(Long id) { repo.deleteById(id); }

@@ -30,8 +30,7 @@ public class MatchRepository implements MyAppRepository<Match, String> {
         Match m = em.find(Match.class, id);
         if (m == null) throw new Exception("Match not found: " + id);
         return m;
-    }
-
+    } 
     @Override @Transactional
     public void save(Match entity) {
         // ID je string (PK iz Riot-a) — koristimo merge za upsert
@@ -42,5 +41,9 @@ public class MatchRepository implements MyAppRepository<Match, String> {
     public void deleteById(String id) {
         Match m = em.find(Match.class, id);
         if (m != null) em.remove(m);
+    }
+    
+    public Match findByIdOrNull(String id) {
+        return em.find(Match.class, id);
     }
 }

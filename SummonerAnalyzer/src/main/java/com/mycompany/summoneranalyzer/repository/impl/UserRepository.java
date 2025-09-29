@@ -5,29 +5,44 @@
 package com.mycompany.summoneranalyzer.repository.impl; 
 
 import com.mycompany.summoneranalyzer.entity.impl.User;
+import com.mycompany.summoneranalyzer.repository.MyAppRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
 
 @Repository
-public class UserRepository {
+public class UserRepository implements MyAppRepository<User, Long> {
 
     @PersistenceContext
     private EntityManager em;
 
+    @Override
+    public List<User> findAll() {
+        return em.createQuery("SELECT u FROM User u", User.class).getResultList();
+    }
+
+    @Override
+    public User findById(Long id) { return em.find(User.class, id); }
+
     public User findByEmail(String email) {
-        List<User> list = em.createQuery("SELECT u FROM User u WHERE lower(u.email)=lower(:e)", User.class)
-                .setParameter("e", email)
-                .getResultList();
+        var list = em.createQuery("SELECT u FROM User u WHERE u.email = :e", User.class)
+                     .setParameter("e", email)
+                     .getResultList();
         return list.isEmpty() ? null : list.get(0);
     }
 
-    public User findById(Long id) { return em.find(User.class, id); }
+    @Override @Transactional
+    public void save(User entity) {
+        if (entity.getId() == null) em.persist(entity);
+        else em.merge(entity);
+    }
 
-    public void save(User u) {
-        if (u.getId() == null) em.persist(u);
-        else em.merge(u);
+    @Override @Transactional
+    public void deleteById(Long id) {
+        User u = em.find(User.class, id);
+        if (u != null) em.remove(u);
     }
 }

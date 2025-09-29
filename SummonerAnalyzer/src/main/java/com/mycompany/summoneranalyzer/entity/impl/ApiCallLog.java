@@ -21,7 +21,7 @@ public class ApiCallLog {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable=false, length=80)
+    @Column(nullable=false, length=800)
     private String endpoint;
 
     @Column(nullable=false)
@@ -32,7 +32,7 @@ public class ApiCallLog {
     private Region region;
 
     @Column(nullable=true)
-    private Long actorUserId; // ko je pokrenuo (nije obavezna veza)
+    private Long actorUserId; // ko je pokrenuo 
 
     @Column(nullable=false)
     private LocalDateTime createdAt = LocalDateTime.now();

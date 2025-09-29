@@ -1,8 +1,4 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
-package com.mycompany.summoneranalyzer.servis;  
+package com.mycompany.summoneranalyzer.servis;
 
 import com.mycompany.summoneranalyzer.dto.impl.MatchDto;
 import com.mycompany.summoneranalyzer.dto.impl.MatchSummaryDto;
@@ -10,10 +6,9 @@ import com.mycompany.summoneranalyzer.dto.impl.SummonerProfileDto;
 import com.mycompany.summoneranalyzer.entity.impl.enums.GameType;
 import com.mycompany.summoneranalyzer.entity.impl.enums.Region;
 import com.mycompany.summoneranalyzer.riot.RiotApiClient;
-import com.mycompany.summoneranalyzer.riot.dto.LeagueEntryDtoRiot;
-import com.mycompany.summoneranalyzer.riot.dto.MatchV5DtoRiot;
-import jakarta.transaction.Transactional;
+import com.mycompany.summoneranalyzer.riot.dto.*;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -29,65 +24,108 @@ public class SummonerSyncService {
     private final MatchSummaryService summaries;
     private final ApiLogService apiLog;
 
-    public SummonerSyncService(RiotApiClient riot,
-                               SummonerProfileService summoners,
-                               MatchService matches,
-                               MatchSummaryService summaries,
-                               ApiLogService apiLog) {
-        this.riot = riot; this.summoners = summoners; this.matches = matches; this.summaries = summaries; this.apiLog = apiLog;
+    public SummonerSyncService(
+            RiotApiClient riot,
+            SummonerProfileService summoners,
+            MatchService matches,
+            MatchSummaryService summaries,
+            ApiLogService apiLog
+    ) {
+        this.riot = riot;
+        this.summoners = summoners;
+        this.matches = matches;
+        this.summaries = summaries;
+        this.apiLog = apiLog;
+    }
+
+    /** POST /api/summoners/sync?name=<RiotID_ili_SummonerName>&region=EUNE&lastN=10 */
+    @Transactional
+    public SummonerProfileDto syncByName(String name, Region region, int lastN) throws Exception {
+        if (name == null || name.isBlank()) throw new Exception("Ime summoner-a je obavezno");
+        if (name.contains("#")) {
+            return syncByRiotId(name, region, lastN);
+        }
+        SummonerDtoRiot summonerRiot = riot.getSummonerByName(name, region)
+            .doOnSuccess(r -> apiLog.ok("/summoner/by-name", region))
+            .doOnError(e -> apiLog.fail("/summoner/by-name", region))
+            .block();
+        if (summonerRiot == null) throw new Exception("Summoner po imenu nije pronađen: " + name);
+        return syncFromSummoner(summonerRiot, region, lastN);
+    }
+
+    /** "Caps#000" → (gameName, tagLine) */
+    @Transactional
+    public SummonerProfileDto syncByRiotId(String riotId, Region region, int lastN) throws Exception {
+        if (!riotId.contains("#")) throw new Exception("Riot ID format: gameName#tagLine");
+        String[] parts = riotId.split("#", 2);
+        return syncByRiotId(parts[0], parts[1], region, lastN);
     }
 
     @Transactional
-    public SummonerProfileDto syncByName(String name, Region region, int lastN) throws Exception {
-        var summonerRiot = riot.getSummonerByName(name, region)
-                .doOnSuccess(r -> apiLog.ok("/summoner/by-name", region))
-                .doOnError(e -> apiLog.fail("/summoner/by-name", region))
-                .block();
+    public SummonerProfileDto syncByRiotId(String gameName, String tagLine, Region region, int lastN) throws Exception {
+        AccountDtoRiot acc = riot.getAccountByRiotId(gameName, tagLine, region)
+            .doOnSuccess(r -> apiLog.ok("/riot/account/by-riot-id", region))
+            .doOnError(e -> apiLog.fail("/riot/account/by-riot-id", region))
+            .block();
+        if (acc == null || acc.getPuuid() == null) {
+            throw new Exception("Nije pronađen Riot nalog za: " + gameName + "#" + tagLine);
+        }
 
-        if (summonerRiot == null) throw new Exception("Summoner not found on Riot");
+        SummonerDtoRiot summonerRiot = riot.getSummonerByPuuid(acc.getPuuid(), region)
+            .doOnSuccess(r -> apiLog.ok("/summoner/by-puuid", region))
+            .doOnError(e -> apiLog.fail("/summoner/by-puuid", region))
+            .block();
+        if (summonerRiot == null) throw new Exception("Summoner za PUUID nije pronađen");
 
-        var leagues = riot.getLeagueBySummonerId(summonerRiot.getId(), region)
-                .doOnSuccess(r -> apiLog.ok("/league/by-summoner", region))
-                .doOnError(e -> apiLog.fail("/league/by-summoner", region))
-                .block();
+        return syncFromSummoner(summonerRiot, region, lastN);
+    }
 
-        var sp = new SummonerProfileDto(
-                null,
-                summonerRiot.getPuuid(),
-                summonerRiot.getName(),
-                region,
-                summonerRiot.getSummonerLevel(),
-                extractTier(leagues),
-                extractDivision(leagues),
-                extractLP(leagues),
-                LocalDateTime.now()
+    /* ================= Core ================= */
+
+    private SummonerProfileDto syncFromSummoner(SummonerDtoRiot s, Region region, int lastN) throws Exception {
+        // LEAGUE by-PUUID (po tvojim dozvolama)
+        List<LeagueEntryDtoRiot> leagues = riot.getLeagueByPuuid(s.getPuuid(), region)
+            .doOnSuccess(r -> apiLog.ok("/league/by-puuid", region))
+            .doOnError(e -> apiLog.fail("/league/by-puuid", region))
+            .block();
+
+        SummonerProfileDto sp = new SummonerProfileDto(
+            null,
+            s.getPuuid(),
+            s.getName(),
+            region,
+            s.getSummonerLevel(),
+            extractTier(leagues),
+            extractDivision(leagues),
+            extractLP(leagues),
+            LocalDateTime.now()
         );
-        var savedProfile = summoners.upsert(sp);
+        SummonerProfileDto saved = summoners.upsert(sp);
 
-        var matchIds = riot.getRecentMatchIds(summonerRiot.getPuuid(), region, lastN)
-                .doOnSuccess(r -> apiLog.ok("/match/ids", region))
-                .doOnError(e -> apiLog.fail("/match/ids", region))
-                .block();
+        List<String> matchIds = riot.getRecentMatchIds(s.getPuuid(), region, lastN)
+            .doOnSuccess(r -> apiLog.ok("/match/ids", region))
+            .doOnError(e -> apiLog.fail("/match/ids", region))
+            .block();
 
         if (matchIds != null) {
             for (String mid : matchIds) {
-                var matchDtoRiot = riot.getMatch(mid, region)
-                        .doOnSuccess(r -> apiLog.ok("/match/" + mid, region))
-                        .doOnError(e -> apiLog.fail("/match/" + mid, region))
-                        .block();
-                if (matchDtoRiot == null) continue;
+                MatchV5DtoRiot match = riot.getMatch(mid, region)
+                    .doOnSuccess(r -> apiLog.ok("/match/" + mid, region))
+                    .doOnError(e -> apiLog.fail("/match/" + mid, region))
+                    .block();
+                if (match == null) continue;
 
-                MatchDto m = mapMatch(mid, matchDtoRiot, region);
+                MatchDto m = mapMatch(mid, match, region);
                 matches.upsert(m);
 
-                MatchSummaryDto ms = mapSummaryForPuuid(mid, matchDtoRiot, savedProfile.getId(), savedProfile.getPuuid());
+                MatchSummaryDto ms = mapSummaryForPuuid(mid, match, saved.getId(), saved.getPuuid());
                 if (ms != null) summaries.create(ms);
             }
         }
-        return savedProfile;
+        return saved;
     }
 
-    /* ===== Helpers ===== */
+    /* ================= Helpers ================= */
 
     private String extractTier(List<LeagueEntryDtoRiot> leagues) {
         return (leagues == null || leagues.isEmpty()) ? null : leagues.get(0).getTier();
@@ -101,22 +139,21 @@ public class SummonerSyncService {
 
     private MatchDto mapMatch(String matchId, MatchV5DtoRiot m, Region region) {
         var info = m.getInfo();
-
         MatchDto dto = new MatchDto();
         dto.setId(matchId);
         dto.setRegion(region);
         dto.setDurationSec(info.getGameDuration());
 
-        // Preciznije je koristiti queueId (ako ga dodaš u Riot DTO). Za sada grubo:
+        // preciznije bi bilo po queueId; zadržavam tvoju grubu mapu
         GameType gt = switch (info.getGameMode()) {
-            case "ARAM" -> GameType.ARAM;
-            case "CLASSIC" -> GameType.RANKED; // može biti i NORMAL; zavisi od queueId
-            default -> GameType.NORMAL;
+            case "ARAM"    -> GameType.ARAM;
+            case "CLASSIC" -> GameType.RANKED; // može biti i NORMAL; koristi queueId po želji
+            default        -> GameType.NORMAL;
         };
         dto.setGameType(gt);
 
         LocalDateTime started = LocalDateTime.ofInstant(
-                Instant.ofEpochMilli(info.getGameStartTimestamp()), ZoneOffset.UTC);
+            Instant.ofEpochMilli(info.getGameStartTimestamp()), ZoneOffset.UTC);
         dto.setStartedAt(started);
 
         return dto;
@@ -124,8 +161,8 @@ public class SummonerSyncService {
 
     private MatchSummaryDto mapSummaryForPuuid(String matchId, MatchV5DtoRiot m, Long summonerDbId, String puuid) {
         var p = m.getInfo().getParticipants().stream()
-                .filter(x -> puuid.equals(x.getPuuid()))
-                .findFirst().orElse(null);
+            .filter(x -> puuid.equals(x.getPuuid()))
+            .findFirst().orElse(null);
         if (p == null) return null;
 
         MatchSummaryDto ms = new MatchSummaryDto();

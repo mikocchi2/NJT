@@ -5,12 +5,20 @@
 package com.mycompany.summoneranalyzer.riot.dto;
 
 public class LeagueEntryDtoRiot {
-    private String queueType; // "RANKED_SOLO_5x5"
-    private String tier;      // GOLD/PLATINUM
-    private String rank;      // I/II/III/IV
+    private String leagueId;
+    private String queueType;   // npr. RANKED_SOLO_5x5
+    private String tier;        // GOLD/PLAT/...
+    private String rank;        // I/II/III/IV
     private Integer leaguePoints;
-    public String getQueueType(){return queueType;} public void setQueueType(String v){this.queueType=v;}
-    public String getTier(){return tier;} public void setTier(String v){this.tier=v;}
-    public String getRank(){return rank;} public void setRank(String v){this.rank=v;}
-    public Integer getLeaguePoints(){return leaguePoints;} public void setLeaguePoints(Integer v){this.leaguePoints=v;}
+
+    public String getLeagueId() { return leagueId; }
+    public void setLeagueId(String leagueId) { this.leagueId = leagueId; }
+    public String getQueueType() { return queueType; }
+    public void setQueueType(String queueType) { this.queueType = queueType; }
+    public String getTier() { return tier; }
+    public void setTier(String tier) { this.tier = tier; }
+    public String getRank() { return rank; }
+    public void setRank(String rank) { this.rank = rank; }
+    public Integer getLeaguePoints() { return leaguePoints; }
+    public void setLeaguePoints(Integer leaguePoints) { this.leaguePoints = leaguePoints; }
 }
