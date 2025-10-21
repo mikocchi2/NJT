@@ -2,6 +2,7 @@ package com.mycompany.summoneranalyzer.servis;
 
 import com.mycompany.summoneranalyzer.dto.impl.MatchDto;
 import com.mycompany.summoneranalyzer.dto.impl.MatchSummaryDto;
+import com.mycompany.summoneranalyzer.dto.impl.RecentMatchDto;
 import com.mycompany.summoneranalyzer.dto.impl.SummonerProfileDto;
 import com.mycompany.summoneranalyzer.entity.impl.enums.GameType;
 import com.mycompany.summoneranalyzer.entity.impl.enums.Region;
@@ -14,6 +15,7 @@ import reactor.core.publisher.Mono;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -132,6 +134,8 @@ public class SummonerSyncService {
         );
         SummonerProfileDto saved = summoners.upsert(sp);
 
+        List<RecentMatchDto> recentMatches = new ArrayList<>();
+
         List<String> matchIds = riot.getRecentMatchIds(s.getPuuid(), region, lastN)
             .doOnSuccess(r -> apiLog.ok("/match/ids", region))
             .doOnError(e -> apiLog.fail("/match/ids", region))
@@ -150,8 +154,15 @@ public class SummonerSyncService {
 
                 MatchSummaryDto ms = mapSummaryForPuuid(mid, match, saved.getId(), saved.getPuuid());
                 if (ms != null) summaries.upsertForMatchAndSummoner(ms);
+
+                RecentMatchDto recent = mapRecentMatch(mid, match, saved.getPuuid());
+                if (recent != null) {
+                    recentMatches.add(recent);
+                }
             }
         }
+        saved.setMatches(recentMatches);
+        saved.setIconId(s.getProfileIconId());
         return saved;
     }
 
@@ -218,5 +229,32 @@ public class SummonerSyncService {
         ms.setAssists(p.getAssists());
         ms.setWin(p.isWin());
         return ms;
+    }
+
+    private RecentMatchDto mapRecentMatch(String matchId, MatchV5DtoRiot match, String puuid) {
+        if (match == null || match.getInfo() == null) {
+            return null;
+        }
+
+        var info = match.getInfo();
+        var participant = info.getParticipants().stream()
+            .filter(x -> puuid.equals(x.getPuuid()))
+            .findFirst()
+            .orElse(null);
+        if (participant == null) {
+            return null;
+        }
+
+        RecentMatchDto dto = new RecentMatchDto();
+        dto.setId(matchId);
+        dto.setQueueId(info.getQueueId());
+        dto.setGameDuration(info.getGameDuration());
+        dto.setGameCreation(Instant.ofEpochMilli(info.getGameCreation()));
+        dto.setChampionName(participant.getChampionName());
+        dto.setKills(participant.getKills());
+        dto.setDeaths(participant.getDeaths());
+        dto.setAssists(participant.getAssists());
+        dto.setWin(participant.isWin());
+        return dto;
     }
 }
