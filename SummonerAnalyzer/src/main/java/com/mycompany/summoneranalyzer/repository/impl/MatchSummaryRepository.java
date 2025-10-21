@@ -63,7 +63,20 @@ public class MatchSummaryRepository implements MyAppRepository<MatchSummary, Lon
         MatchSummary ms = em.find(MatchSummary.class, id);
         if (ms != null) em.remove(ms);
     }
-        public List<MatchSummary> findBySummonerId(Long summonerId) {
+
+    public MatchSummary findByMatchAndSummoner(String matchId, Long summonerId) {
+        return em.createQuery(
+                "SELECT ms FROM MatchSummary ms " +
+                "WHERE ms.match.id = :mid AND ms.summoner.id = :sid",
+                MatchSummary.class)
+            .setParameter("mid", matchId)
+            .setParameter("sid", summonerId)
+            .getResultStream()
+            .findFirst()
+            .orElse(null);
+    }
+
+    public List<MatchSummary> findBySummonerId(Long summonerId) {
         return em.createQuery(
                 "SELECT ms FROM MatchSummary ms " +
                 "JOIN FETCH ms.match m " +            // da odmah povučemo match (gameType/duration)

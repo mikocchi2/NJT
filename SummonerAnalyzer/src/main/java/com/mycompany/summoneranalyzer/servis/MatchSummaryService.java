@@ -42,13 +42,28 @@ public class MatchSummaryService {
 
     @Transactional
     public MatchSummaryDto create(MatchSummaryDto dto) throws Exception {
-        if (dto.getMatchId() == null || dto.getSummonerId() == null)
-            throw new Exception("matchId and summonerId are required");
+        return upsertForMatchAndSummoner(dto);
+    }
 
-        MatchSummary e = new MatchSummary();
-        e.setMatch(em.getReference(Match.class, dto.getMatchId()));
-        e.setSummoner(em.getReference(SummonerProfile.class, dto.getSummonerId()));
-        e.setChampion(dto.getChampion());
+    @Transactional
+    public MatchSummaryDto upsertForMatchAndSummoner(MatchSummaryDto dto) throws Exception {
+        if (dto.getMatchId() == null || dto.getSummonerId() == null) {
+            throw new Exception("matchId and summonerId are required");
+        }
+
+        MatchSummary existing = repo.findByMatchAndSummoner(dto.getMatchId(), dto.getSummonerId());
+        MatchSummary e = existing != null ? existing : new MatchSummary();
+        if (existing == null) {
+            e.setMatch(em.getReference(Match.class, dto.getMatchId()));
+            e.setSummoner(em.getReference(SummonerProfile.class, dto.getSummonerId()));
+        }
+
+        if (dto.getChampion() != null && !dto.getChampion().isBlank()) {
+            e.setChampion(dto.getChampion());
+        } else if (existing == null) {
+            e.setChampion("Unknown");
+        }
+
         e.setKills(dto.getKills() != null ? dto.getKills() : 0);
         e.setDeaths(dto.getDeaths() != null ? dto.getDeaths() : 0);
         e.setAssists(dto.getAssists() != null ? dto.getAssists() : 0);
