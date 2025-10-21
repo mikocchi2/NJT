@@ -86,6 +86,25 @@ public class SummonerSyncService {
         return syncFromSummoner(summonerRiot, region, lastN, acc);
     }
 
+    @Transactional
+    public SummonerProfileDto syncByPuuid(String puuid, Region region, int lastN) throws Exception {
+        if (puuid == null || puuid.isBlank()) throw new Exception("PUUID je obavezan");
+
+        SummonerDtoRiot summonerRiot = riot.getSummonerByPuuid(puuid, region)
+            .doOnSuccess(r -> apiLog.ok("/summoner/by-puuid", region))
+            .doOnError(e -> apiLog.fail("/summoner/by-puuid", region))
+            .block();
+        if (summonerRiot == null) throw new Exception("Summoner za PUUID nije pronađen");
+
+        AccountDtoRiot account = riot.getAccountByPuuid(puuid, region)
+            .doOnSuccess(r -> apiLog.ok("/riot/account/by-puuid", region))
+            .doOnError(e -> apiLog.fail("/riot/account/by-puuid", region))
+            .onErrorResume(ex -> Mono.empty())
+            .block();
+
+        return syncFromSummoner(summonerRiot, region, lastN, account);
+    }
+
     /* ================= Core ================= */
 
     private SummonerProfileDto syncFromSummoner(SummonerDtoRiot s, Region region, int lastN) throws Exception {

@@ -40,9 +40,13 @@ export default function Profile() {
     try {
       setLoading(true); setErr("");
       // backend dozvoljava name ILI riotId parametar; imamo bar display name
-      await api.post(`/summoners/sync`, null, {
-        params: { name: profile.name, region: profile.region, lastN: 10 },
-      });
+      const params = { region: profile.region, lastN: 10 };
+      if (profile.puuid) {
+        params.puuid = profile.puuid;
+      } else {
+        params.name = profile.name;
+      }
+      await api.post(`/summoners/sync`, null, { params });
       await loadMatches();
     } catch (ex) {
       setErr(

@@ -56,13 +56,17 @@ public class SummonerProfileController {
     public ResponseEntity<SummonerProfileDto> syncByName(
         @RequestParam(required = false) String name,
         @RequestParam(required = false, name = "riotId") String riotId,
+        @RequestParam(required = false) String puuid,
         @RequestParam(defaultValue = "EUNE") Region region,
         @RequestParam(defaultValue = "10") int lastN
     ) {
         try {
+            if (puuid != null && !puuid.isBlank()) {
+                return ResponseEntity.ok(sync.syncByPuuid(puuid, region, lastN));
+            }
             String input = (riotId != null && !riotId.isBlank()) ? riotId : name;
             if (input == null || input.isBlank()) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parametar 'name' ili 'riotId' je obavezan");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parametar 'name', 'riotId' ili 'puuid' je obavezan");
             }
             return ResponseEntity.ok(sync.syncByName(input, region, lastN));
         } catch (Exception e) {
