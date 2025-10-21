@@ -9,6 +9,7 @@ export default function Profile() {
   const [matches, setMatches] = useState([]);
   const [filters, setFilters] = useState({ gameType:"", win:"", minKills:"" });
   const [loading, setLoading] = useState(false);
+  const [matchesLoaded, setMatchesLoaded] = useState(false);
   const [err, setErr] = useState("");
 
   const loadProfile = async () => {
@@ -21,7 +22,7 @@ export default function Profile() {
   };
 
   const loadMatches = async () => {
-    setLoading(true); setErr("");
+    setLoading(true); setErr(""); setMatchesLoaded(false);
     try {
       const params = {};
       if (filters.gameType) params.gameType = filters.gameType;
@@ -29,6 +30,7 @@ export default function Profile() {
       if (filters.minKills) params.minKills = Number(filters.minKills);
       const { data } = await api.get(`/matches/by-summoner/${id}`, { params });
       setMatches(data || []);
+      setMatchesLoaded(true);
     } catch {
       setErr("Ne mogu da učitam mečeve.");
     } finally { setLoading(false); }
@@ -103,7 +105,7 @@ export default function Profile() {
               <div style={{fontSize:12, color:"#666"}}>matchId: {m.matchId}</div>
             </div>
           ))}
-          {!matches.length && <div>Nema mečeva za ovaj nalog (pokušaj Osveži ili drugo ime).</div>}
+          {matchesLoaded && !matches.length && <div>Nema mečeva za ovaj nalog (pokušaj Osveži ili drugo ime).</div>}
         </div>
       )}
     </div>
