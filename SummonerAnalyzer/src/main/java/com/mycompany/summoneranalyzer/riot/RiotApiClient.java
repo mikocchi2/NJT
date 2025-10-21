@@ -67,6 +67,15 @@ public class RiotApiClient {
             .bodyToMono(AccountDtoRiot.class);
     }
 
+    public Mono<AccountDtoRiot> getAccountByPuuid(String puuid, Region region) {
+        String url = regionalHost(region) + "/riot/account/v1/accounts/by-puuid/" + enc(puuid);
+        return web.get().uri(url)
+            .retrieve()
+            .onStatus(status -> status.isError(), resp -> resp.bodyToMono(String.class)
+                .flatMap(body -> Mono.error(new RuntimeException("account-v1(by-puuid) error: " + resp.statusCode() + " " + body))))
+            .bodyToMono(AccountDtoRiot.class);
+    }
+
     /* ================== SUMMONER / LEAGUE ================== */
 
     public Mono<SummonerDtoRiot> getSummonerByPuuid(String puuid, Region region) {
