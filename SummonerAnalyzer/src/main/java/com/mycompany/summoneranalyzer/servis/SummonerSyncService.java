@@ -8,6 +8,8 @@ import com.mycompany.summoneranalyzer.entity.impl.enums.GameType;
 import com.mycompany.summoneranalyzer.entity.impl.enums.Region;
 import com.mycompany.summoneranalyzer.riot.RiotApiClient;
 import com.mycompany.summoneranalyzer.riot.dto.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Mono;
@@ -20,6 +22,8 @@ import java.util.List;
 
 @Service
 public class SummonerSyncService {
+
+    private static final Logger log = LoggerFactory.getLogger(SummonerSyncService.class);
 
     private final RiotApiClient riot;
     private final SummonerProfileService summoners;
@@ -141,19 +145,38 @@ public class SummonerSyncService {
             .doOnError(e -> apiLog.fail("/match/ids", region))
             .block();
 
-        if (matchIds != null) {
+        if (matchIds == null || matchIds.isEmpty()) {
+            log.info("[SummonerSync] No recent matches returned for PUUID={} (region={}, lastN={})", s.getPuuid(), region, lastN);
+        } else {
+            log.info("[SummonerSync] Recent match IDs for PUUID={} (region={}, lastN={}): {}", s.getPuuid(), region, lastN, matchIds);
+
             for (String mid : matchIds) {
                 MatchV5DtoRiot match = riot.getMatch(mid, region)
                     .doOnSuccess(r -> apiLog.ok("/match/" + mid, region))
                     .doOnError(e -> apiLog.fail("/match/" + mid, region))
                     .block();
-                if (match == null) continue;
+                if (match == null) {
+                    log.warn("[SummonerSync] Riot API returned empty match payload for matchId={} (puuid={}, region={})", mid, s.getPuuid(), region);
+                    continue;
+                }
+
+                log.info("[SummonerSync] Fetched match {} for puuid={} (queueId={}, gameDuration={})",
+                        mid,
+                        s.getPuuid(),
+                        match.getInfo() != null ? match.getInfo().getQueueId() : null,
+                        match.getInfo() != null ? match.getInfo().getGameDuration() : null
+                );
 
                 MatchDto m = mapMatch(mid, match, region);
                 matches.upsert(m);
+                log.info("[SummonerSync] Saved match {} to database (region={}, gameType={})", mid, region, m.getGameType());
 
                 MatchSummaryDto ms = mapSummaryForPuuid(mid, match, saved.getId(), saved.getPuuid());
-                if (ms != null) summaries.upsertForMatchAndSummoner(ms);
+                if (ms != null) {
+                    summaries.upsertForMatchAndSummoner(ms);
+                    log.info("[SummonerSync] Upserted match summary for matchId={} and summonerId={} (win={}, kda={}/{}/{})",
+                            mid, saved.getId(), ms.getWin(), ms.getKills(), ms.getDeaths(), ms.getAssists());
+                }
 
                 RecentMatchDto recent = mapRecentMatch(mid, match, saved.getPuuid());
                 if (recent != null) {
