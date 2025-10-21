@@ -7,6 +7,7 @@ import com.mycompany.summoneranalyzer.riot.dto.MatchV5DtoRiot;
 import com.mycompany.summoneranalyzer.riot.dto.SummonerDtoRiot;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.core.ParameterizedTypeReference;
 import reactor.core.publisher.Mono;
 
 import java.net.URLEncoder;
@@ -115,8 +116,7 @@ public class RiotApiClient {
             .retrieve()
             .onStatus(status -> status.isError(), resp -> resp.bodyToMono(String.class)
                 .flatMap(body -> Mono.error(new RuntimeException("match-v5(ids) error: " + resp.statusCode() + " " + body))))
-            .bodyToFlux(String.class)
-            .collectList();
+            .bodyToMono(new ParameterizedTypeReference<List<String>>() {});
     }
 
 public Mono<MatchV5DtoRiot> getMatch(String matchId, Region region) {
