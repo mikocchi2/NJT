@@ -149,7 +149,7 @@ public class SummonerSyncService {
                 matches.upsert(m);
 
                 MatchSummaryDto ms = mapSummaryForPuuid(mid, match, saved.getId(), saved.getPuuid());
-                if (ms != null) summaries.create(ms);
+                if (ms != null) summaries.upsertForMatchAndSummoner(ms);
             }
         }
         return saved;
