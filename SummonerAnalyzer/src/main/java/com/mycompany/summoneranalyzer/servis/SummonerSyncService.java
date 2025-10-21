@@ -140,6 +140,15 @@ public class SummonerSyncService {
 
         List<RecentMatchDto> recentMatches = new ArrayList<>();
 
+        String targetPuuid = saved.getPuuid() != null ? saved.getPuuid() : s.getPuuid();
+        if (targetPuuid == null || targetPuuid.isBlank()) {
+            targetPuuid = s.getPuuid();
+        }
+        boolean hasValidPuuid = targetPuuid != null && !targetPuuid.isBlank();
+        if (!hasValidPuuid) {
+            log.warn("[SummonerSync] Missing PUUID for match mapping (summonerId={}, riotPuuid={})", saved.getId(), s.getPuuid());
+        }
+
         List<String> matchIds = riot.getRecentMatchIds(s.getPuuid(), region, lastN)
             .doOnSuccess(r -> apiLog.ok("/match/ids", region))
             .doOnError(e -> apiLog.fail("/match/ids", region))
@@ -171,16 +180,18 @@ public class SummonerSyncService {
                 matches.upsert(m);
                 log.info("[SummonerSync] Saved match {} to database (region={}, gameType={})", mid, region, m.getGameType());
 
-                MatchSummaryDto ms = mapSummaryForPuuid(mid, match, saved.getId(), saved.getPuuid());
-                if (ms != null) {
-                    summaries.upsertForMatchAndSummoner(ms);
-                    log.info("[SummonerSync] Upserted match summary for matchId={} and summonerId={} (win={}, kda={}/{}/{})",
-                            mid, saved.getId(), ms.getWin(), ms.getKills(), ms.getDeaths(), ms.getAssists());
-                }
+                if (hasValidPuuid) {
+                    MatchSummaryDto ms = mapSummaryForPuuid(mid, match, saved.getId(), targetPuuid);
+                    if (ms != null) {
+                        summaries.upsertForMatchAndSummoner(ms);
+                        log.info("[SummonerSync] Upserted match summary for matchId={} and summonerId={} (win={}, kda={}/{}/{})",
+                                mid, saved.getId(), ms.getWin(), ms.getKills(), ms.getDeaths(), ms.getAssists());
+                    }
 
-                RecentMatchDto recent = mapRecentMatch(mid, match, saved.getPuuid());
-                if (recent != null) {
-                    recentMatches.add(recent);
+                    RecentMatchDto recent = mapRecentMatch(mid, match, targetPuuid);
+                    if (recent != null) {
+                        recentMatches.add(recent);
+                    }
                 }
             }
         }
