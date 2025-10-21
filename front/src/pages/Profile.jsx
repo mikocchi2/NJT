@@ -46,8 +46,12 @@ export default function Profile() {
       const params = { region: profile.region, lastN: 10 };
       if (profile.puuid) {
         params.puuid = profile.puuid;
-      } else {
-        params.name = profile.name;
+      }
+      if (profile.name) {
+        params.riotId = profile.name;
+        if (!profile.puuid) {
+          params.name = profile.name;
+        }
       }
       await api.post(`/summoners/sync`, null, { params });
       await loadMatches();
