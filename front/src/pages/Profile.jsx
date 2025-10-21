@@ -1,5 +1,5 @@
 // src/pages/Profile.jsx
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import api from "../api";
 
@@ -10,18 +10,19 @@ export default function Profile() {
   const [filters, setFilters] = useState({ gameType:"", win:"", minKills:"" });
   const [loading, setLoading] = useState(false);
   const [matchesLoaded, setMatchesLoaded] = useState(false);
+  const [autoRefreshed, setAutoRefreshed] = useState(false);
   const [err, setErr] = useState("");
 
-  const loadProfile = async () => {
+  const loadProfile = useCallback(async () => {
     try {
       const { data } = await api.get(`/summoners/${id}`);
       setProfile(data);
     } catch {
       setErr("Ne mogu da učitam profil.");
     }
-  };
+  }, [id]);
 
-  const loadMatches = async () => {
+  const loadMatches = useCallback(async () => {
     setLoading(true); setErr(""); setMatchesLoaded(false);
     try {
       const params = {};
@@ -34,10 +35,10 @@ export default function Profile() {
     } catch {
       setErr("Ne mogu da učitam mečeve.");
     } finally { setLoading(false); }
-  };
+  }, [filters.gameType, filters.minKills, filters.win, id]);
 
   // ručni "refresh" – pokuša sync opet (povući će lastN=10)
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     if (!profile) return;
     try {
       setLoading(true); setErr("");
@@ -59,10 +60,21 @@ export default function Profile() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [profile, loadMatches]);
 
-  useEffect(() => { loadProfile(); }, [id]);
-  useEffect(() => { loadMatches(); }, [id, filters]);
+  useEffect(() => { loadProfile(); }, [loadProfile]);
+  useEffect(() => {
+    setAutoRefreshed(false);
+    setMatches([]);
+    setMatchesLoaded(false);
+  }, [id]);
+  useEffect(() => { loadMatches(); }, [loadMatches]);
+  useEffect(() => {
+    if (profile && matchesLoaded && matches.length === 0 && !autoRefreshed && !loading) {
+      setAutoRefreshed(true);
+      refresh();
+    }
+  }, [profile, matchesLoaded, matches.length, autoRefreshed, refresh, loading]);
 
   if (!profile) return <div style={{padding:24}}>Učitavanje profila...</div>;
 
