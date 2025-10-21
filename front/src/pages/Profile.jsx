@@ -109,9 +109,9 @@ export default function Profile() {
       <div style={{display:"flex", gap:8, marginBottom:10}}>
         <select value={filters.gameType} onChange={e=>setFilters(f=>({...f, gameType:e.target.value}))}>
           <option value="">Svi tipovi</option>
-          <option value="Ranked">Ranked</option>
+          <option value="RANKED">Ranked</option>
           <option value="ARAM">ARAM</option>
-          <option value="Normal">Normal</option>
+          <option value="NORMAL">Normal</option>
         </select>
         <select value={filters.win} onChange={e=>setFilters(f=>({...f, win:e.target.value}))}>
           <option value="">Svi rezultati</option>
