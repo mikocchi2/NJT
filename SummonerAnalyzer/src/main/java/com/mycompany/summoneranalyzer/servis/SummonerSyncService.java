@@ -9,6 +9,7 @@ import com.mycompany.summoneranalyzer.riot.RiotApiClient;
 import com.mycompany.summoneranalyzer.riot.dto.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Mono;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -50,7 +51,12 @@ public class SummonerSyncService {
             .doOnError(e -> apiLog.fail("/summoner/by-name", region))
             .block();
         if (summonerRiot == null) throw new Exception("Summoner po imenu nije pronađen: " + name);
-        return syncFromSummoner(summonerRiot, region, lastN);
+        AccountDtoRiot account = riot.getAccountByPuuid(summonerRiot.getPuuid(), region)
+            .doOnSuccess(r -> apiLog.ok("/riot/account/by-puuid", region))
+            .doOnError(e -> apiLog.fail("/riot/account/by-puuid", region))
+            .onErrorResume(ex -> Mono.empty())
+            .block();
+        return syncFromSummoner(summonerRiot, region, lastN, account);
     }
 
     /** "Caps#000" → (gameName, tagLine) */
@@ -77,22 +83,27 @@ public class SummonerSyncService {
             .block();
         if (summonerRiot == null) throw new Exception("Summoner za PUUID nije pronađen");
 
-        return syncFromSummoner(summonerRiot, region, lastN);
+        return syncFromSummoner(summonerRiot, region, lastN, acc);
     }
 
     /* ================= Core ================= */
 
     private SummonerProfileDto syncFromSummoner(SummonerDtoRiot s, Region region, int lastN) throws Exception {
+        return syncFromSummoner(s, region, lastN, null);
+    }
+
+    private SummonerProfileDto syncFromSummoner(SummonerDtoRiot s, Region region, int lastN, AccountDtoRiot account) throws Exception {
         // LEAGUE by-PUUID (po tvojim dozvolama)
         List<LeagueEntryDtoRiot> leagues = riot.getLeagueByPuuid(s.getPuuid(), region)
             .doOnSuccess(r -> apiLog.ok("/league/by-puuid", region))
             .doOnError(e -> apiLog.fail("/league/by-puuid", region))
             .block();
 
+        String displayName = resolveDisplayName(account, s);
         SummonerProfileDto sp = new SummonerProfileDto(
             null,
             s.getPuuid(),
-            s.getName(),
+            displayName,
             region,
             s.getSummonerLevel(),
             extractTier(leagues),
@@ -126,6 +137,20 @@ public class SummonerSyncService {
     }
 
     /* ================= Helpers ================= */
+
+    private String resolveDisplayName(AccountDtoRiot account, SummonerDtoRiot summoner) {
+        if (account != null) {
+            String gameName = account.getGameName();
+            String tagLine = account.getTagLine();
+            if (gameName != null && !gameName.isBlank() && tagLine != null && !tagLine.isBlank()) {
+                return gameName + "#" + tagLine;
+            }
+            if (gameName != null && !gameName.isBlank()) {
+                return gameName;
+            }
+        }
+        return summoner.getName();
+    }
 
     private String extractTier(List<LeagueEntryDtoRiot> leagues) {
         return (leagues == null || leagues.isEmpty()) ? null : leagues.get(0).getTier();
