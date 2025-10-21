@@ -61,17 +61,44 @@ public class SummonerProfileController {
         @RequestParam(defaultValue = "10") int lastN
     ) {
         try {
+            String fallbackInput = firstNonBlank(riotId, name);
+
             if (puuid != null && !puuid.isBlank()) {
-                return ResponseEntity.ok(sync.syncByPuuid(puuid, region, lastN));
+                try {
+                    return ResponseEntity.ok(sync.syncByPuuid(puuid, region, lastN));
+                } catch (Exception ex) {
+                    if (fallbackInput != null) {
+                        try {
+                            return ResponseEntity.ok(sync.syncByName(fallbackInput, region, lastN));
+                        } catch (Exception fallbackEx) {
+                            throw new Exception(ex.getMessage() + " | fallback failed: " + fallbackEx.getMessage(), fallbackEx);
+                        }
+                    }
+                    throw ex;
+                }
             }
-            String input = (riotId != null && !riotId.isBlank()) ? riotId : name;
-            if (input == null || input.isBlank()) {
+
+            if (fallbackInput == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Parametar 'name', 'riotId' ili 'puuid' je obavezan");
             }
-            return ResponseEntity.ok(sync.syncByName(input, region, lastN));
+            return ResponseEntity.ok(sync.syncByName(fallbackInput, region, lastN));
+        } catch (ResponseStatusException rse) {
+            throw rse;
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Sync failed: " + e.getMessage());
         }
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 
     @PostMapping("/upsert")
