@@ -64,8 +64,8 @@ export default function Profile() {
       console.log("\n\n[Profile] refresh() params:", JSON.stringify(params), "\n\n");
       await api.post(`/summoners/sync`, null, { params });
       console.log("\n\n[Profile] refresh() sync request done\n\n");
-      await loadMatches();
-      console.log("\n\n[Profile] refresh() loadMatches finished\n\n");
+      await Promise.all([loadProfile(), loadMatches()]);
+      console.log("\n\n[Profile] refresh() loadProfile/loadMatches finished\n\n");
     } catch (ex) {
       console.log("\n\n[Profile] refresh() failed:", ex);
       setErr(
@@ -76,7 +76,7 @@ export default function Profile() {
     } finally {
       setLoading(false);
     }
-  }, [profile, loadMatches]);
+  }, [profile, loadMatches, loadProfile]);
 
   useEffect(() => { loadProfile(); }, [loadProfile]);
   useEffect(() => {
