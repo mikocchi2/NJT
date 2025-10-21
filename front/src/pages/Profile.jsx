@@ -14,25 +14,32 @@ export default function Profile() {
   const [err, setErr] = useState("");
 
   const loadProfile = useCallback(async () => {
+    console.log("\n\n[Profile] loadProfile() start for", id, "\n\n");
     try {
       const { data } = await api.get(`/summoners/${id}`);
+      console.log("\n\n[Profile] loadProfile() fetched:", JSON.stringify(data, null, 2), "\n\n");
       setProfile(data);
     } catch {
+      console.log("\n\n[Profile] loadProfile() failed for", id, "\n\n");
       setErr("Ne mogu da učitam profil.");
     }
   }, [id]);
 
   const loadMatches = useCallback(async () => {
+    console.log("\n\n[Profile] loadMatches() start for", id, "filters:", JSON.stringify(filters), "\n\n");
     setLoading(true); setErr(""); setMatchesLoaded(false);
     try {
       const params = {};
       if (filters.gameType) params.gameType = filters.gameType;
       if (filters.win !== "") params.win = filters.win === "true";
       if (filters.minKills) params.minKills = Number(filters.minKills);
+      console.log("\n\n[Profile] loadMatches() query params:", JSON.stringify(params), "\n\n");
       const { data } = await api.get(`/matches/by-summoner/${id}`, { params });
+      console.log("\n\n[Profile] loadMatches() fetched", Array.isArray(data) ? data.length : "?", "matches", "\n", JSON.stringify(data, null, 2), "\n\n");
       setMatches(data || []);
       setMatchesLoaded(true);
     } catch {
+      console.log("\n\n[Profile] loadMatches() failed for", id, "\n\n");
       setErr("Ne mogu da učitam mečeve.");
     } finally { setLoading(false); }
   }, [filters.gameType, filters.minKills, filters.win, id]);
@@ -40,6 +47,7 @@ export default function Profile() {
   // ručni "refresh" – pokuša sync opet (povući će lastN=10)
   const refresh = useCallback(async () => {
     if (!profile) return;
+    console.log("\n\n[Profile] refresh() start for", id, "profile:", JSON.stringify(profile), "\n\n");
     try {
       setLoading(true); setErr("");
       // backend dozvoljava name ILI riotId parametar; imamo bar display name
@@ -53,9 +61,13 @@ export default function Profile() {
           params.name = profile.name;
         }
       }
+      console.log("\n\n[Profile] refresh() params:", JSON.stringify(params), "\n\n");
       await api.post(`/summoners/sync`, null, { params });
+      console.log("\n\n[Profile] refresh() sync request done\n\n");
       await loadMatches();
+      console.log("\n\n[Profile] refresh() loadMatches finished\n\n");
     } catch (ex) {
+      console.log("\n\n[Profile] refresh() failed:", ex);
       setErr(
         ex?.response?.data?.message ||
         ex?.response?.data?.error ||
