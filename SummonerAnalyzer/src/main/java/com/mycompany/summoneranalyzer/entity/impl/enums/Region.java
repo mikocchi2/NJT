@@ -6,6 +6,6 @@ package com.mycompany.summoneranalyzer.entity.impl.enums;
 
 /**
  *
- * @author vanja
+ * @author mikocchi2
  */
 public enum Region { EUNE, EUW, NA1, KR, BR1, JP1, OC1, RU, TR1, LA1, LA2 }

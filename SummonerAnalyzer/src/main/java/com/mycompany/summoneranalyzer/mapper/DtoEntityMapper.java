@@ -6,7 +6,7 @@ package com.mycompany.summoneranalyzer.mapper;
 
 /**
  *
- * @author vanja
+ * @author mikocchi2
  */
 
 public interface DtoEntityMapper<T,E>{

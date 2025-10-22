@@ -6,7 +6,7 @@ package com.mycompany.summoneranalyzer.dto;
 
 /**
  *
- * @author vanja
+ * @author mikocchi2
  */
 public interface Dto {
     

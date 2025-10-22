@@ -9,7 +9,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 /**
  *
- * @author vanja
+ * @author mikocchi2
  */
 @SpringBootApplication 
 public class Main {
