@@ -1,6 +1,5 @@
 // src/pages/Search.jsx
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import api from "../api";
 
 export default function Search() {
@@ -9,7 +8,6 @@ export default function Search() {
   const [loading, setLoading] = useState(false);
   const [profile, setProfile] = useState(null);
   const [err, setErr] = useState("");
-  const nav = useNavigate();
 
   // FILTERI
   const [queueFilter, setQueueFilter] = useState("ALL");    // ALL|RANKED_SOLO|RANKED_FLEX|ARAM|NORMALS
@@ -24,8 +22,8 @@ export default function Search() {
     setLoading(true);
     setProfile(null);
     try {
-      const { data } = await api.post("/summoners/sync", null, {
-        params: { riotId: riotId.trim(), region, lastN: 10 },
+      const { data } = await api.get("/search", {
+        params: { riotId: riotId.trim(), region, count: 10 },
       });
       setProfile(data);
     } catch (ex) {
@@ -56,7 +54,10 @@ export default function Search() {
     }
 
     if (resultFilter !== "ALL") {
-      ms = ms.filter((m) => (resultFilter === "WIN" ? m.win : !m.win));
+      ms = ms.filter((m) => {
+        const win = Boolean(m.win);
+        return resultFilter === "WIN" ? win : !win;
+      });
     }
 
     if (minKills > 0) {
@@ -127,13 +128,8 @@ export default function Search() {
                 {profile.leaguePoints != null ? `(${profile.leaguePoints} LP)` : ""}
               </div>
               <div>Region: {profile.region}</div>
-              <div>Last sync: {profile.lastSyncedAt ? formatDate(profile.lastSyncedAt) : "-"}</div>
-            </div>
-
-            <div>
-              <button onClick={() => nav(`/profile/${profile.id}`)} style={{ marginTop: 4 }}>
-                Otvori profil
-              </button>
+              <div>Riot ID: {profile.riotId ?? "-"}</div>
+              <div>Fetched: {profile.fetchedAt ? formatDate(profile.fetchedAt) : "-"}</div>
             </div>
           </div>
 
