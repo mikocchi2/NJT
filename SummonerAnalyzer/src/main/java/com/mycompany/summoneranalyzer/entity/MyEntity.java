@@ -6,7 +6,7 @@ package com.mycompany.summoneranalyzer.entity;
 
 /**
  *
- * @author vanja
+ * @author mikocchi2
  */
 public interface MyEntity {
     

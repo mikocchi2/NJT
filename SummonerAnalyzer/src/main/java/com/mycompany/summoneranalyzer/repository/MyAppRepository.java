@@ -8,7 +8,7 @@ import java.util.List;
 
 /**
  *
- * @author vanja
+ * @author mikocchi2
  */
 public interface MyAppRepository<E, ID> {
  

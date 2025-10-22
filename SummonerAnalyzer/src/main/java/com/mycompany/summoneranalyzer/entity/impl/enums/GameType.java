@@ -6,6 +6,6 @@ package com.mycompany.summoneranalyzer.entity.impl.enums;
 
 /**
  *
- * @author vanja
+ * @author mikocchi2
  */
 public enum GameType { RANKED, ARAM, NORMAL }

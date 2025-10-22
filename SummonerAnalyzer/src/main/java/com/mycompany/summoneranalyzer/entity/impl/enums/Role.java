@@ -6,6 +6,6 @@ package com.mycompany.summoneranalyzer.entity.impl.enums;
 
 /**
  *
- * @author vanja
+ * @author mikocchi2
  */
 public enum Role { USER, ADMIN }
