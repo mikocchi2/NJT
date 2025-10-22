@@ -1,6 +1,23 @@
 // src/pages/Search.jsx
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import api from "../api";
+
+function getSessionUser() {
+  const pick = (k) => sessionStorage.getItem(k) ?? localStorage.getItem(k);
+  try {
+    const rawUser = pick("user");
+    const rawMe = pick("me");
+    const tokenOnly = pick("token");
+    const parsed = rawUser ? JSON.parse(rawUser) : rawMe ? JSON.parse(rawMe) : {};
+    return {
+      token: parsed.token || tokenOnly || parsed?.user?.token || null,
+      userId: parsed.userId ?? parsed.id ?? parsed?.user?.id ?? null,
+      email: parsed.email ?? parsed?.user?.email ?? null,
+    };
+  } catch {
+    return { token: null, userId: null, email: null };
+  }
+}
 
 export default function Search() {
   const [riotId, setRiotId] = useState("");            // npr. "Caps#000"
@@ -8,6 +25,12 @@ export default function Search() {
   const [loading, setLoading] = useState(false);
   const [profile, setProfile] = useState(null);
   const [err, setErr] = useState("");
+  const [favoriteErr, setFavoriteErr] = useState("");
+
+  const [auth, setAuth] = useState(getSessionUser());
+  const [favoritesMap, setFavoritesMap] = useState(new Map()); // summonerId -> favoriteId
+  const [syncedSummoner, setSyncedSummoner] = useState(null);
+  const [favoriteBusy, setFavoriteBusy] = useState(false);
 
   // FILTERI
   const [queueFilter, setQueueFilter] = useState("ALL");    // ALL|RANKED_SOLO|RANKED_FLEX|ARAM|NORMALS
@@ -16,11 +39,49 @@ export default function Search() {
 
   const isRiotIdValid = (s) => /^.+#.+$/.test(s.trim());
 
+  useEffect(() => {
+    const a = getSessionUser();
+    setAuth(a);
+  }, []);
+
+  useEffect(() => {
+    if (auth.token) {
+      api.defaults.headers.common.Authorization = `Bearer ${auth.token}`;
+    } else {
+      delete api.defaults.headers.common.Authorization;
+    }
+  }, [auth.token]);
+
+  const loadFavorites = useCallback(async (userId) => {
+    if (!userId) {
+      setFavoritesMap(new Map());
+      return;
+    }
+    try {
+      const { data } = await api.get(`/favorites/user/${userId}`);
+      const map = new Map();
+      (data || []).forEach((fav) => {
+        if (fav?.summonerId != null) {
+          map.set(Number(fav.summonerId), fav.id);
+        }
+      });
+      setFavoritesMap(map);
+    } catch {
+      setFavoritesMap(new Map());
+    }
+  }, []);
+
+  useEffect(() => {
+    loadFavorites(auth.userId);
+  }, [auth.userId, loadFavorites]);
+
   const submit = async (e) => {
     e.preventDefault();
     setErr("");
+    setFavoriteErr("");
     setLoading(true);
     setProfile(null);
+    setSyncedSummoner(null);
     try {
       const { data } = await api.get("/search", {
         params: { riotId: riotId.trim(), region, count: 10 },
@@ -67,6 +128,136 @@ export default function Search() {
     return ms;
   }, [profile, queueFilter, resultFilter, minKills]);
 
+  const regionParam = useMemo(() => {
+    if (!profile?.region) return region;
+    if (typeof profile.region === "string") return profile.region;
+    if (typeof profile.region === "object" && profile.region?.name) {
+      return profile.region.name;
+    }
+    return region;
+  }, [profile, region]);
+
+  useEffect(() => {
+    setSyncedSummoner(null);
+    setFavoriteErr("");
+    if (!profile) {
+      return;
+    }
+
+    let ignore = false;
+    const fetchExisting = async () => {
+      const candidates = [];
+      if (profile.name) candidates.push(profile.name);
+      if (profile.riotId && profile.riotId !== profile.name) {
+        candidates.push(profile.riotId);
+      }
+      for (const candidate of candidates) {
+        if (!candidate) continue;
+        try {
+          const { data } = await api.get("/summoners/search", {
+            params: { name: candidate, region: regionParam },
+          });
+          if (!ignore && data) {
+            setSyncedSummoner(data);
+          }
+          return;
+        } catch (ex) {
+          const status = ex?.response?.status;
+          if (status && status !== 404) {
+            return;
+          }
+        }
+      }
+    };
+
+    fetchExisting();
+    return () => {
+      ignore = true;
+    };
+  }, [profile, regionParam]);
+
+  const ensureSummonerProfile = useCallback(async () => {
+    if (!profile) {
+      throw new Error("Nema učitanog summoner-a.");
+    }
+    if (syncedSummoner?.id != null) {
+      return syncedSummoner;
+    }
+
+    const candidates = [];
+    if (profile.name) candidates.push(profile.name);
+    if (profile.riotId && profile.riotId !== profile.name) {
+      candidates.push(profile.riotId);
+    }
+
+    for (const candidate of candidates) {
+      try {
+        const { data } = await api.get("/summoners/search", {
+          params: { name: candidate, region: regionParam },
+        });
+        if (data) {
+          setSyncedSummoner(data);
+          return data;
+        }
+      } catch (ex) {
+        const status = ex?.response?.status;
+        if (status && status !== 404) {
+          throw ex;
+        }
+      }
+    }
+
+    const params = { region: regionParam, lastN: 10 };
+    if (profile.puuid) params.puuid = profile.puuid;
+    else if (profile.riotId) params.riotId = profile.riotId;
+    else if (profile.name) params.name = profile.name;
+
+    const { data } = await api.post("/summoners/sync", null, { params });
+    setSyncedSummoner(data);
+    return data;
+  }, [profile, regionParam, syncedSummoner]);
+
+  const toggleFavorite = useCallback(async () => {
+    if (!profile) return;
+    if (!auth.userId) {
+      setFavoriteErr("Moraš biti ulogovan da bi menjao favorite.");
+      return;
+    }
+    setFavoriteErr("");
+    setFavoriteBusy(true);
+    try {
+      const summoner = await ensureSummonerProfile();
+      if (!summoner?.id) {
+        throw new Error("Summoner nema ID u bazi.");
+      }
+      const sid = Number(summoner.id);
+      const existingFavoriteId = favoritesMap.get(sid);
+      if (existingFavoriteId) {
+        await api.delete(`/favorites/${existingFavoriteId}`);
+      } else {
+        await api.post("/favorites", {
+          userId: auth.userId,
+          summonerId: sid,
+          note: "",
+        });
+      }
+      await loadFavorites(auth.userId);
+    } catch (ex) {
+      const msg =
+        ex?.response?.data?.message ||
+        ex?.response?.data?.error ||
+        ex?.message ||
+        "Promena favorita nije uspela.";
+      setFavoriteErr(msg);
+    } finally {
+      setFavoriteBusy(false);
+    }
+  }, [auth.userId, ensureSummonerProfile, favoritesMap, loadFavorites, profile]);
+
+  const currentSummonerId = syncedSummoner?.id != null ? Number(syncedSummoner.id) : null;
+  const currentFavoriteId = currentSummonerId != null ? favoritesMap.get(currentSummonerId) : null;
+  const isFavorite = Boolean(currentFavoriteId);
+
   return (
     <div style={{ maxWidth: 920, margin: "24px auto", padding: "0 12px" }}>
       <h2>Pretraga Summonera</h2>
@@ -109,6 +300,7 @@ export default function Search() {
               borderRadius: 8,
               display: "flex",
               gap: 12,
+              alignItems: "flex-start",
             }}
           >
             <img
@@ -131,7 +323,42 @@ export default function Search() {
               <div>Riot ID: {profile.riotId ?? "-"}</div>
               <div>Fetched: {profile.fetchedAt ? formatDate(profile.fetchedAt) : "-"}</div>
             </div>
+            <button
+              type="button"
+              onClick={toggleFavorite}
+              disabled={favoriteBusy || !auth.userId}
+              aria-label={
+                auth.userId
+                  ? isFavorite
+                    ? "Ukloni iz favorita"
+                    : "Sačuvaj u favorite"
+                  : "Uloguj se da sačuvaš u favorite"
+              }
+              aria-pressed={isFavorite}
+              title={
+                auth.userId
+                  ? isFavorite
+                    ? "Ukloni iz favorita"
+                    : "Sačuvaj u favorite"
+                  : "Uloguj se da sačuvaš u favorite"
+              }
+              style={{
+                background: "transparent",
+                border: "none",
+                fontSize: 28,
+                lineHeight: 1,
+                cursor: auth.userId ? "pointer" : "not-allowed",
+                color: isFavorite ? "#facc15" : "#d1d5db",
+                padding: 4,
+              }}
+            >
+              {favoriteBusy ? "…" : isFavorite ? "★" : "☆"}
+            </button>
           </div>
+
+          {favoriteErr && (
+            <div style={{ color: "red", marginTop: 8 }}>{favoriteErr}</div>
+          )}
 
           {/* Filter traka */}
           <div
