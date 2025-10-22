@@ -149,12 +149,6 @@ export default function Summoners() {
       <div style={{display:"grid", gap:8}}>
         {data.map(p => (
           <div key={p.id} style={{border:"1px solid #eee", borderRadius:8, padding:12, display:"flex", gap:12, alignItems:"center"}}>
-            <img
-              alt="icon"
-              src={p.iconId != null ? ddProfileIcon(p.iconId) : undefined}
-              style={{ width: 48, height: 48, borderRadius: 8, background: "#f5f5f5" }}
-              onError={(e)=>{ e.target.style.display="none"; }}
-            />
             <div style={{flex:1}}>
               <div style={{fontWeight:700}}>{p.name || "-"}</div>
               <div style={{fontSize:13, color:"#555"}}>
@@ -187,9 +181,4 @@ export default function Summoners() {
       </div>
     </div>
   );
-}
-
-function ddProfileIcon(iconId){
-  const ver = "14.1.1";
-  return `https://ddragon.leagueoflegends.com/cdn/${ver}/img/profileicon/${iconId}.png`;
 }
