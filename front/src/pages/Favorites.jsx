@@ -149,7 +149,7 @@ export default function Favorites() {
       ) : !rows.length ? (
         <div>
           Nema favorita. Dodaj summonera preko strane <Link to="/search">Search</Link>{" "}
-          ili <Link to="/summoner">Summoners</Link>.
+          ili <Link to="/summoners">Summoners</Link>.
         </div>
       ) : (
         <div style={{ display: "grid", gap: 8 }}>

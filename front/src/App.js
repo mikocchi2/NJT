@@ -46,7 +46,7 @@ export default function App() {
         <Route path="/search" element={<Search/>} />
         <Route path="/profile/:id" element={<Profile/>} />
         <Route path="/favorites" element={token ? <Favorites/> : <Navigate to="/login" replace />} />
-        <Route path="/summoner" element={<Summoners />} />
+        <Route path="/summoners" element={<Summoners />} />
         <Route path="/admin" element={  <Admin/>  } />
 
 

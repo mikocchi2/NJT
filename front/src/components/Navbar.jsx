@@ -35,18 +35,9 @@ export default function Navbar() {
       {/* Left: public routes */}
       <NavLink to="/" style={linkStyle}>Home</NavLink>
       <NavLink to="/search" style={linkStyle}>Search</NavLink>
-      <button
-        onClick={() => nav("/summoner")}
-        style={{
-          padding: "6px 10px",
-          borderRadius: 6,
-          border: "1px solid #ddd",
-          background: "#f5f5f5",
-          cursor: "pointer"
-        }}
-      >
-        Summoner
-      </button>
+      <NavLink to="/summoners" style={linkStyle}>
+        Summoners
+      </NavLink>
 
       {/* Auth-only */}
       {token && <NavLink to="/favorites" style={linkStyle}>Favorites</NavLink>}
